@@ -2,10 +2,10 @@ import 'dotenv/config';
 import http from 'node:http';
 import { URL } from 'node:url';
 import {
-  connectDatabase,
-  closeDatabase,
-  getDatabaseStatus
-} from './database.js';
+  connectSupabaseDatabase,
+  closeSupabaseDatabase,
+  getSupabaseStatus
+} from './supabase-database.js';
 
 const HOST = process.env.HOST || '127.0.0.1';
 const PORT = Number(process.env.PORT || 3001);
@@ -55,7 +55,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'GET' && pathname === '/api/v1/health/ready') {
-    const db = getDatabaseStatus();
+    const db = getSupabaseStatus();
     const statusCode = db.ready ? 200 : 503;
 
     res.writeHead(statusCode, {
@@ -86,7 +86,7 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`HisabX API listening at http://${HOST}:${PORT}`);
   console.log(`Live check: http://${HOST}:${PORT}/api/v1/health/live`);
-  void connectDatabase();
+  void connectSupabaseDatabase();
 });
 
 let shuttingDown = false;
@@ -98,7 +98,7 @@ async function shutdown(signal) {
 
   server.close(async (error) => {
     try {
-      await closeDatabase();
+      await closeSupabaseDatabase();
     } catch (dbError) {
       console.error('Database shutdown error:', dbError.message);
     }

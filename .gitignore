@@ -1,0 +1,15 @@
+# STEP 00 PRIVATE MATERIAL — DO NOT PUBLISH
+/private/
+/STEP-00-BOOTSTRAP-RECOVERY.py
+/.step00-bootstrap-backup/
+/.step00-bootstrap-stage-*/
+
+# Internal Foundation documents — keep out of public Git
+/foundation/*.md
+
+# Keep all Foundation internals private; public intro is explicitly allowed
+/foundation/*
+!/foundation/index.html
+
+# Local-only recovery generator
+/STEP-00-REBUILD.py
