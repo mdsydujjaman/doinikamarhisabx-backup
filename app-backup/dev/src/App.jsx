@@ -1,209 +1,126 @@
-const BASE_URL = import.meta.env.BASE_URL;
-const ROOT_URL = 'https://mdsydujjaman.github.io/doinikamarhisab-X/';
+import { useState, useEffect } from 'react';
 
-const features = [
-  { title: 'খরচ যোগ', color: '#3b82f6' },
-  { title: 'আয় যোগ', color: '#22c55e' },
-  { title: 'বাকি খাতা', color: '#a855f7' },
-  { title: 'রিপোর্ট', color: '#f59e0b' },
+const ACCOUNTS = [
+  { id: 'cash', name: 'হাতে নগদ' },
+  { id: 'bkash', name: 'বিকাশ' },
+  { id: 'bank', name: 'ব্যাংক' },
 ];
 
 export default function App() {
-  const balance = 12500;
+  const [transactions, setTransactions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('hisabx-transactions-v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [type, setType] = useState('income');
+  const [account, setAccount] = useState('cash');
+  const [person, setPerson] = useState('');
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem('hisabx-transactions-v1', JSON.stringify(transactions));
+  }, [transactions]);
+
+  const balanceByAccount = {};
+  ACCOUNTS.forEach(a => balanceByAccount[a.id] = 0);
+  let totalReceivable = 0;
+  let totalPayable = 0;
+
+  transactions.forEach(t => {
+    const amt = Number(t.amount) || 0;
+    if (t.type === 'income') { balanceByAccount[t.account] += amt; }
+    if (t.type === 'expense') { balanceByAccount[t.account] -= amt; }
+    if (t.type === 'lent') { balanceByAccount[t.account] -= amt; totalReceivable += amt; }
+    if (t.type === 'borrowed') { balanceByAccount[t.account] += amt; totalPayable += amt; }
+    if (t.type === 'received') { totalReceivable -= amt; balanceByAccount[t.account] += amt; }
+    if (t.type === 'paid') { totalPayable -= amt; balanceByAccount[t.account] -= amt; }
+  });
+
+  const totalCashBank = balanceByAccount.cash + balanceByAccount.bkash + balanceByAccount.bank;
+  const totalAssets = totalCashBank + totalReceivable;
+  const totalLiabilities = totalPayable;
+  const netWorth = totalAssets - totalLiabilities;
+
+  const addTransaction = () => {
+    const amt = Number(amount);
+    if (!amt || amt <= 0) { alert('দয়া করে টাকার পরিমাণ লিখুন।'); return; }
+    if ((type === 'lent' || type === 'borrowed' || type === 'received' || type === 'paid') && !person.trim()) {
+      alert('দয়া করে ব্যক্তির নাম লিখুন।'); return;
+    }
+    const newTx = { id: Date.now().toString(), type, account, person: person.trim(), amount: amt, note: note.trim(), date: new Date().toISOString().slice(0, 10) };
+    setTransactions([newTx, ...transactions]);
+    setAmount(''); setPerson(''); setNote('');
+    alert('লেনদেন সংরক্ষণ করা হয়েছে।');
+  };
+
+  const typeLabel = (t) => {
+    if (t === 'income') return 'আয়';
+    if (t === 'expense') return 'ব্যয়';
+    if (t === 'lent') return 'আমি টাকা দিলাম';
+    if (t === 'borrowed') return 'আমি টাকা নিলাম';
+    if (t === 'received') return 'পাওনা পেলাম';
+    if (t === 'paid') return 'দেনা পরিশোধ করলাম';
+    return t;
+  };
 
   return (
-    <main style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg,#0A1931,#102b50,#071426)',
-      padding: 18,
-      fontFamily: 'system-ui,"Noto Sans Bengali",sans-serif',
-      color: '#fff'
-    }}>
+    <main style={{ minHeight: '100vh', background: '#0A1931', padding: 18, fontFamily: 'system-ui,"Noto Sans Bengali",sans-serif', color: '#fff' }}>
       <div style={{ maxWidth: 460, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>দৈনিক আমার হিসাবX</div>
+          <div style={{ fontSize: 12, opacity: .7 }}>আপনার সব হিসাব, এক অ্যাপে</div>
+        </div>
 
-        <header style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 10,
-          marginBottom: 22
-        }}>
-          <div>
-            <div style={{ fontSize: 19, fontWeight: 800 }}>
-              দৈনিক আমার হিসাবX
-            </div>
-            <div style={{ fontSize: 12, opacity: .7 }}>
-              আপনার সব হিসাব, এক অ্যাপ
-            </div>
+        <section style={{ background: 'linear-gradient(145deg,#fff,#dce8f5)', borderRadius: 24, padding: 20, color: '#0f172a', marginBottom: 16 }}>
+          <p style={{ margin: 0, color: '#475569' }}>আমার মোট সম্পত্তি</p>
+          <h1 style={{ fontSize: 32, margin: '8px 0' }}>৳ {netWorth.toLocaleString('bn-BD')}</h1>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
+            <div style={{ background: '#0f766e', color: '#fff', padding: 12, borderRadius: 12, textAlign: 'center' }}>মোট সম্পত্তি<br /><strong>৳ {totalAssets.toLocaleString('bn-BD')}</strong></div>
+            <div style={{ background: '#dc2626', color: '#fff', padding: 12, borderRadius: 12, textAlign: 'center' }}>মোট দায়<br /><strong>৳ {totalLiabilities.toLocaleString('bn-BD')}</strong></div>
           </div>
-          <span style={{
-            background: '#f59e0b',
-            color: '#111827',
-            padding: '7px 11px',
-            borderRadius: 20,
-            fontSize: 11,
-            fontWeight: 800
-          }}>
-            BACKUP PREVIEW
-          </span>
-        </header>
-
-        <nav style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 10,
-          marginBottom: 20
-        }}>
-          <a href={ROOT_URL} target="_blank" rel="noopener noreferrer"
-            style={navStyle}>
-            ROOT LIVE ↗
-          </a>
-          <a href={BASE_URL} style={{
-            ...navStyle,
-            background: '#f59e0b',
-            color: '#172033'
-          }}>
-            BACKUP LIVE
-          </a>
-        </nav>
-
-        <section style={{
-          background: 'linear-gradient(145deg,#fff,#dce8f5)',
-          borderRadius: 24,
-          padding: 24,
-          color: '#0f172a',
-          boxShadow: '0 18px 38px #0007',
-          marginBottom: 20
-        }}>
-          <p style={{ margin: 0, color: '#475569' }}>
-            মোট ব্যালেন্স
-          </p>
-          <h1 style={{ fontSize: 36, margin: '8px 0' }}>
-            ৳ {balance.toLocaleString('bn-BD')}
-          </h1>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 10,
-            marginTop: 16
-          }}>
-            <div style={{
-              background: '#0f766e',
-              color: '#fff',
-              padding: 13,
-              borderRadius: 12,
-              textAlign: 'center'
-            }}>
-              আয়
-              <strong style={{ display: 'block', marginTop: 5 }}>৳ ৫,০০০</strong>
-            </div>
-            <div style={{
-              background: '#dc2626',
-              color: '#fff',
-              padding: 13,
-              borderRadius: 12,
-              textAlign: 'center'
-            }}>
-              ব্যয়
-              <strong style={{ display: 'block', marginTop: 5 }}>৳ ১,২০০</strong>
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 12, fontSize: 12, textAlign: 'center' }}>
+            <div style={{ background: '#e2e8f0', padding: 8, borderRadius: 10 }}>হাতে নগদ<br /><strong>৳ {balanceByAccount.cash.toLocaleString('bn-BD')}</strong></div>
+            <div style={{ background: '#e2e8f0', padding: 8, borderRadius: 10 }}>বিকাশ<br /><strong>৳ {balanceByAccount.bkash.toLocaleString('bn-BD')}</strong></div>
+            <div style={{ background: '#e2e8f0', padding: 8, borderRadius: 10 }}>ব্যাংক<br /><strong>৳ {balanceByAccount.bank.toLocaleString('bn-BD')}</strong></div>
           </div>
-          <p style={{
-            fontSize: 11,
-            color: '#64748b',
-            marginBottom: 0
-          }}>
-            এগুলো শুধু নমুনা তথ্য; বাস্তব লেনদেন নয়।
-          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8, fontSize: 12, textAlign: 'center' }}>
+            <div style={{ background: '#ede9fe', padding: 8, borderRadius: 10 }}>আমি পাবো<br /><strong>৳ {totalReceivable.toLocaleString('bn-BD')}</strong></div>
+            <div style={{ background: '#fee2e2', padding: 8, borderRadius: 10 }}>আমি দেবো<br /><strong>৳ {totalPayable.toLocaleString('bn-BD')}</strong></div>
+          </div>
         </section>
 
-        <h3 style={{ margin: '0 0 12px' }}>হিসাবের ফিচার</h3>
+        <section style={{ background: '#12294b', borderRadius: 18, padding: 16, marginBottom: 16 }}>
+          <h3 style={{ margin: '0 0 12px' }}>+ নতুন লেনদেন</h3>
+          <select value={type} onChange={e => setType(e.target.value)} style={{ width: '100%', padding: 12, borderRadius: 10, marginBottom: 10 }}>
+            <option value="income">আয়</option>
+            <option value="expense">ব্যয়</option>
+            <option value="lent">আমি টাকা দিলাম</option>
+            <option value="borrowed">আমি টাকা নিলাম</option>
+            <option value="received">পাওনা পেলাম</option>
+            <option value="paid">দেনা পরিশোধ করলাম</option>
+          </select>
+          <select value={account} onChange={e => setAccount(e.target.value)} style={{ width: '100%', padding: 12, borderRadius: 10, marginBottom: 10 }}>
+            {ACCOUNTS.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+          <input value={person} onChange={e => setPerson(e.target.value)} placeholder="ব্যক্তির নাম" style={{ width: '100%', padding: 12, borderRadius: 10, marginBottom: 10 }} />
+          <input value={amount} onChange={e => setAmount(e.target.value)} type="number" placeholder="টাকার পরিমাণ" style={{ width: '100%', padding: 12, borderRadius: 10, marginBottom: 10 }} />
+          <input value={note} onChange={e => setNote(e.target.value)} placeholder="বিবরণ" style={{ width: '100%', padding: 12, borderRadius: 10, marginBottom: 12 }} />
+          <button onClick={addTransaction} style={{ width: '100%', padding: 14, borderRadius: 12, background: '#185ADB', color: '#fff', fontWeight: 800, border: 'none' }}>হিসাব সংরক্ষণ করুন</button>
+        </section>
 
-        <section style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 12
-        }}>
-          {features.map((item) => (
-            <div key={item.title} style={{
-              padding: 19,
-              borderRadius: 18,
-              background: item.color,
-              textAlign: 'center',
-              fontWeight: 800,
-              boxShadow: '0 8px 18px #0005'
-            }}>
-              {item.title}
-              <div style={{
-                fontSize: 11,
-                fontWeight: 500,
-                marginTop: 8,
-                opacity: .9
-              }}>
-                পরবর্তী ধাপে চালু হবে
-              </div>
+        <section>
+          <h3 style={{ margin: '0 0 10px' }}>লেনদেনের ইতিহাস — {transactions.length}টি</h3>
+          {transactions.length === 0 && <p style={{ opacity: .7, fontSize: 13 }}>এখনো কোনো লেনদেন নেই।</p>}
+          {transactions.map(t => (
+            <div key={t.id} style={{ background: '#12294b', padding: 12, borderRadius: 12, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+              <div><div style={{ fontWeight: 700 }}>{typeLabel(t.type)}</div><div style={{ fontSize: 12, opacity: .7 }}>{t.person ? t.person + ' • ' : ''}{t.date} • {t.note}</div></div>
+              <div style={{ fontWeight: 800 }}>৳ {Number(t.amount).toLocaleString('bn-BD')}</div>
             </div>
           ))}
         </section>
-
-        <section style={{
-          marginTop: 22,
-          padding: 15,
-          border: '1px solid #f59e0b',
-          borderRadius: 14,
-          background: '#f59e0b15',
-          color: '#fde68a',
-          fontSize: 13,
-          lineHeight: 1.8
-        }}>
-          <strong>প্রিভিউ নোট:</strong>
-          <br />
-          এটি বর্তমানে UI Preview। আয়-ব্যয় সংরক্ষণ, লগইন,
-          রিপোর্ট এবং ডাটাবেসের কার্যক্রম এখনো চালু হয়নি।
-        </section>
-
-        <a href={`${BASE_URL}foundation/`} style={{
-          display: 'block',
-          textAlign: 'center',
-          marginTop: 22,
-          padding: 14,
-          borderRadius: 14,
-          background: '#185ADB',
-          color: '#fff',
-          textDecoration: 'none',
-          fontWeight: 700
-        }}>
-          পুরোনো STEP 00 FOUNDATION পেজ দেখুন ↗
-        </a>
-
-        <footer style={{
-          textAlign: 'center',
-          marginTop: 22,
-          paddingBottom: 15,
-          opacity: .65,
-          fontSize: 11,
-          lineHeight: 1.8
-        }}>
-          দৈনিক আমার হিসাবX
-          <br />
-          BACKUP TESTING ENVIRONMENT
-          <br />
-          ROOT LIVE আলাদা ও সুরক্ষিত
-        </footer>
-
       </div>
     </main>
   );
 }
-
-const navStyle = {
-  display: 'block',
-  textAlign: 'center',
-  padding: 13,
-  borderRadius: 13,
-  background: '#185ADB',
-  color: '#fff',
-  textDecoration: 'none',
-  fontSize: 13,
-  fontWeight: 800
-};
