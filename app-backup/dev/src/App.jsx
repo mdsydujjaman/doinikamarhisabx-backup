@@ -83,7 +83,7 @@ export default function App() {
     const map = {};
     transactions.forEach(t => {
       if (!t.person) return;
-      if (!map[personKey(t.person)]) map[personKey(t.person)] = { receivable: 0, payable: 0 };
+      if (!map[personKey(t.person)]) map[personKey(t.person)] = { display: normalizePerson(t.person), receivable: 0, payable: 0 };
       const amt = toPaisa(t.amount);
       if (t.type === 'lent') map[personKey(t.person)].receivable += amt;
       if (t.type === 'received') map[personKey(t.person)].receivable -= amt;
@@ -276,7 +276,7 @@ export default function App() {
           {Object.keys(perPerson).length === 0 && <p style={{ opacity: .7, fontSize: 13 }}>এখনো কারো সাথে ধার / পাওনা / দেনা নেই।</p>}
           {Object.entries(perPerson).map(([name, v]) => (
             <div key={name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #1e3a5f' }}>
-              <span>{name}</span>
+              <span>{v.display || name}</span>
               <span>পাবো ৳ {fmt(v.receivable)} • দেবো ৳ {fmt(v.payable)}</span>
             </div>
           ))}
