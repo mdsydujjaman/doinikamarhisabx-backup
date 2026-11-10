@@ -1,6 +1,15 @@
+const isValidTx=(t,ids)=>{if(!t||typeof t!=='object') return false; if(typeof t.id!=='string'||!t.id.trim()) return false; if(!['income','expense','lent','borrowed','received','paid','transfer'].includes(t.type)) return false; if(!ids.has(t.account)) return false; if(t.type==='transfer'&&!ids.has(t.toAccount)) return false; if(typeof t.amount!=='number'||!Number.isFinite(t.amount)||t.amount<=0) return false; if(!isValidDateStr(t.date)) return false; if(['lent','borrowed','received','paid'].includes(t.type)&&!normalizePerson(t.person)) return false; return true;};
+const isValidAccount=(a)=>a&&typeof a.id==='string'&&a.id.trim()!==''&&typeof a.name==='string'&&a.name.trim()!==''&&Number.isFinite(Number(a.opening))&&Number(a.opening)>=0;
+const isValidDateStr=(s)=>/^\d{4}-\d{2}-\d{2}$/.test(String(s||'')) && !Number.isNaN(Date.parse(String(s)));
+const hasNegativeLedger=(txList)=>Object.values(calcPerPersonFrom(txList)).some(p=>p.receivable<0||p.payable<0);
+const calcPerPersonFrom=(txList)=>{const m={}; txList.forEach(t=>{if(!t.person) return; const k=personKey(t.person); if(!m[k]) m[k]={receivable:0,payable:0}; const a=toPaisa(t.amount); if(t.type==='lent') m[k].receivable+=a; if(t.type==='received') m[k].receivable-=a; if(t.type==='borrowed') m[k].payable+=a; if(t.type==='paid') m[k].payable-=a;}); return m;};
+const personKey=(s)=>normalizePerson(s).toLowerCase();
+const parseAmountToPaisa=(raw)=>{const s=String(raw??'').trim(); if(!/^\d+(\.\d{1,2})?$/.test(s)) return null; const n=Number(s); if(!Number.isFinite(n)||n<=0) return null; return Math.round(n*100);};
+const normalizePerson=(s)=>String(s||'').trim().replace(/\s+/g,' ');
+const getLocalDate=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 import { useState, useEffect, useMemo } from 'react';
 
-const toPaisa = (taka) => Math.round((Number(taka) || 0) * 100);
+const toPaisa = (taka) => { const pp = parseAmountToPaisa(taka); return pp !== null ? pp : 0; };
 const toTaka = (paisa) => (paisa || 0) / 100;
 const fmt = (paisa) => toTaka(paisa).toLocaleString('bn-BD', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
@@ -25,7 +34,7 @@ const TYPES = [
   { id: 'expense', name: 'ব্যয়' },
   { id: 'lent', name: 'আমি টাকা দিলাম' },
   { id: 'borrowed', name: 'আমি টাকা নিলাম' },
-  { id: 'received', name: 'পাওনা পেলাম' },
+  { id: 'received', name: 'পাওনা আদায়' },
   { id: 'paid', name: 'দেনা পরিশোধ করলাম' },
   { id: 'transfer', name: 'টাকা স্থানান্তর' },
 ];
@@ -60,7 +69,7 @@ export default function App() {
   const [person, setPerson] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => getLocalDate());
   const [editId, setEditId] = useState(null);
   const [newAccName, setNewAccName] = useState('');
   const [newAccOpening, setNewAccOpening] = useState('');
@@ -74,12 +83,12 @@ export default function App() {
     const map = {};
     transactions.forEach(t => {
       if (!t.person) return;
-      if (!map[t.person]) map[t.person] = { receivable: 0, payable: 0 };
+      if (!map[personKey(t.person)]) map[personKey(t.person)] = { receivable: 0, payable: 0 };
       const amt = toPaisa(t.amount);
-      if (t.type === 'lent') map[t.person].receivable += amt;
-      if (t.type === 'received') map[t.person].receivable -= amt;
-      if (t.type === 'borrowed') map[t.person].payable += amt;
-      if (t.type === 'paid') map[t.person].payable -= amt;
+      if (t.type === 'lent') map[personKey(t.person)].receivable += amt;
+      if (t.type === 'received') map[personKey(t.person)].receivable -= amt;
+      if (t.type === 'borrowed') map[personKey(t.person)].payable += amt;
+      if (t.type === 'paid') map[personKey(t.person)].payable -= amt;
     });
     return map;
   }, [transactions]);
@@ -115,27 +124,27 @@ export default function App() {
   }, [transactions, search]);
 
   const saveTx = () => {
-    const amt = Number(amount);
+    const _p = parseAmountToPaisa(amount); if(_p===null){alert("টাকার পরিমাণ ঠিক লিখুন — সর্বোচ্চ ২ ঘর দশমিক পর্যন্ত।"); return;} const amt = _p/100;
     if (!amt || amt <= 0) { alert('দয়া করে টাকার পরিমাণ লিখুন।'); return; }
-    if (NEED_PERSON.includes(type) && !person.trim()) { alert('দয়া করে ব্যক্তির নাম লিখুন।'); return; }
-    if (type === 'transfer' && account === toAccount) { alert('একই অ্যাকাউন্টে স্থানান্তর হবে না।'); return; }
+    if (NEED_PERSON.includes(type) && !normalizePerson(person)) { alert('দয়া করে ব্যক্তির নাম লিখুন।'); return; }
+    if (!accounts.find(a=>a.id===account)) { alert('অ্যাকাউন্ট পাওয়া যায়নি।'); return; } if (type === 'transfer' && !accounts.find(a=>a.id===toAccount)) { alert('গন্তব্য অ্যাকাউন্ট পাওয়া যায়নি।'); return; } if (type === 'transfer' && account === toAccount) { alert('একই অ্যাকাউন্টে স্থানান্তর হবে না।'); return; }
     const baseTx = editId ? transactions.filter(x => x.id !== editId) : transactions;
     const basePerPerson = {};
     baseTx.forEach(t => {
       if (!t.person) return;
-      if (!basePerPerson[t.person]) basePerPerson[t.person] = { receivable: 0, payable: 0 };
+      if (!basePerPerson[personKey(t.person)]) basePerPerson[personKey(t.person)] = { receivable: 0, payable: 0 };
       const a = toPaisa(t.amount);
-      if (t.type === 'lent') basePerPerson[t.person].receivable += a;
-      if (t.type === 'received') basePerPerson[t.person].receivable -= a;
-      if (t.type === 'borrowed') basePerPerson[t.person].payable += a;
-      if (t.type === 'paid') basePerPerson[t.person].payable -= a;
+      if (t.type === 'lent') basePerPerson[personKey(t.person)].receivable += a;
+      if (t.type === 'received') basePerPerson[personKey(t.person)].receivable -= a;
+      if (t.type === 'borrowed') basePerPerson[personKey(t.person)].payable += a;
+      if (t.type === 'paid') basePerPerson[personKey(t.person)].payable -= a;
     });
     if (type === 'received') {
-      const due = basePerPerson[person.trim()]?.receivable || 0;
+      const due = basePerPerson[personKey(person)]?.receivable || 0;
       if (toPaisa(amt) > due) { alert(`এই ব্যক্তির কাছে পাওনা আছে ৳ ${fmt(due)}। এর বেশি আদায় করা যাবে না।`); return; }
     }
     if (type === 'paid') {
-      const due = basePerPerson[person.trim()]?.payable || 0;
+      const due = basePerPerson[personKey(person)]?.payable || 0;
       if (toPaisa(amt) > due) { alert(`এই ব্যক্তিকে দিতে হবে ৳ ${fmt(due)}। এর বেশি পরিশোধ করা যাবে না।`); return; }
     }
     if (type === 'transfer' || type === 'expense' || type === 'lent' || type === 'paid') {
@@ -151,8 +160,8 @@ export default function App() {
       });
       if (toPaisa(amt) > balPaisa) { alert(`এই অ্যাকাউন্টে আছে ৳ ${fmt(balPaisa)}। এর বেশি খরচ / স্থানান্তর করা যাবে না।`); return; }
     }
-    const tx = { id: editId || newId(), type, account, toAccount: type === 'transfer' ? toAccount : undefined, person: person.trim(), amount: amt, note: note.trim(), date, updatedAt: new Date().toISOString() };
-    const next = editId ? transactions.map(x => x.id === editId ? tx : x) : [tx, ...transactions];
+    const tx = { id: editId || newId(), type, account, toAccount: type === 'transfer' ? toAccount : undefined, person: normalizePerson(person), amount: amt, note: note.trim(), date, updatedAt: new Date().toISOString() };
+    const next = editId ? transactions.map(x => x.id === editId ? tx : x) : [tx, ...transactions]; if (hasNegativeLedger(next)) { alert("এই সম্পাদনায় কারো পাওনা/দেনা নেগেটিভ হয়ে যাবে — সংরক্ষণ হবে না।"); return; }
     setTransactions(next);
     safeSave('hisabx-transactions-v2', next);
     setAmount(''); setPerson(''); setNote(''); setEditId(null);
@@ -162,33 +171,33 @@ export default function App() {
 
   const startEdit = (t) => {
     setEditId(t.id); setType(t.type); setAccount(t.account); setToAccount(t.toAccount || 'bkash');
-    setPerson(t.person || ''); setAmount(String(t.amount)); setNote(t.note || ''); setDate(t.date || new Date().toISOString().slice(0, 10));
+    setPerson(t.person || ''); setAmount(String(t.amount)); setNote(t.note || ''); setDate(t.date || getLocalDate());
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const deleteTx = (id) => {
     if (!confirm('এই লেনদেনটি মুছে ফেলবেন?')) return;
     const found = transactions.find(x => x.id === id);
-    const next = transactions.filter(x => x.id !== id);
+    const next = transactions.filter(x => x.id !== id); if (hasNegativeLedger(next)) { alert("এই লেনদেন মুছলে কারো পাওনা/দেনা নেগেটিভ হয়ে যাবে — মুছা যাবে না।"); return; }
     setTransactions(next);
     safeSave('hisabx-transactions-v2', next);
     if (found) setDeletedLog([{ ...found, deletedAt: new Date().toISOString() }, ...deletedLog].slice(0, 100));
   };
   const addAccount = () => {
-    if (!newAccName.trim()) { alert('অ্যাকাউন্টের নাম লিখুন।'); return; }
-    const acc = { id: newId(), name: newAccName.trim(), opening: Number(newAccOpening) || 0 };
+    if (!newAccName.trim()) { alert('অ্যাকাউন্টের নাম লিখুন।'); return; } if (newAccOpening.trim()!=='' && parseAmountToPaisa(newAccOpening)===null) { alert('প্রারম্ভিক ব্যালেন্স ঠিক লিখুন — নেগেটিভ না, সর্বোচ্চ ২ ঘর দশমিক।'); return; }
+    const acc = { id: newId(), name: newAccName.trim(), opening: (parseAmountToPaisa(newAccOpening || "0")===null ? -1 : parseAmountToPaisa(newAccOpening || "0")/100) };
     setAccounts([...accounts, acc]); setNewAccName(''); setNewAccOpening('');
   };
   const exportCSV = () => {
     const rows = [['তারিখ', 'ধরন', 'অ্যাকাউন্ট', 'ব্যক্তি', 'টাকা', 'বিবরণ']];
-    transactions.forEach(t => rows.push([t.date, t.type, accounts.find(a => a.id === t.account)?.name || t.account, t.person || '', t.amount, (t.note || '').replace(/,/g, ' ')]));
-    const csv = rows.map(r => r.join(',')).join('\n');
+    transactions.forEach(t => rows.push([t.date, t.type, accounts.find(a => a.id === t.account)?.name || t.account, t.person || '', t.amount, (t.note || '')]));
+    const csv = rows.map(r => r.map(c => JSON.stringify(String(c ?? ''))).join(',')).join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'hisabx-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'hisabx-' + getLocalDate() + '.csv'; a.click();
   };
   const exportJSON = () => {
     const data = { version: 2, exportedAt: new Date().toISOString(), accounts, transactions };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'hisabx-backup-' + new Date().toISOString().slice(0, 10) + '.json'; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'hisabx-backup-' + getLocalDate() + '.json'; a.click();
   };
   const importJSON = (e) => {
     const file = e.target.files?.[0];
@@ -199,7 +208,7 @@ export default function App() {
         const data = JSON.parse(reader.result);
         if (!data || !Array.isArray(data.transactions) || !Array.isArray(data.accounts)) { alert('এই ফাইলটি সঠিক Backup ফাইল না।'); return; }
         if (!confirm('পুরোনো হিসাবের Backup নিয়ে তারপর নতুন হিসাব আনবেন? বর্তমান হিসাব বদলে যাবে।')) return;
-        safeSave('hisabx-backup-before-import', { accounts, transactions, at: new Date().toISOString() });
+        const _ids=new Set(data.accounts.map(a=>a.id)); if(!data.accounts.every(isValidAccount)||!data.transactions.every(tx=>isValidTx(tx,_ids))||hasNegativeLedger(data.transactions)){alert('Backup ফাইলে ভুল / নেগেটিভ হিসাব আছে — ফিরিয়ে আনা হয়নি।'); return;} if(!safeSave('hisabx-backup-before-import', { accounts, transactions, at: new Date().toISOString() })){alert('আগের হিসাবের Backup নেওয়া যায়নি — Restore বাতিল।'); return;}
         setAccounts(data.accounts); setTransactions(data.transactions);
         safeSave('hisabx-accounts-v2', data.accounts); safeSave('hisabx-transactions-v2', data.transactions);
         alert('Backup থেকে হিসাব ফিরিয়ে আনা হয়েছে।');
