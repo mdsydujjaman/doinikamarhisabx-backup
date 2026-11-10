@@ -241,13 +241,14 @@ export default function App() {
             <div style={{ background: '#fee2e2', padding: 8, borderRadius: 10 }}>আমি দেবো<br /><strong>৳ {fmt(calc.pay)}</strong></div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button onClick={exportCSV} style={{ flex: 1, padding: 10, borderRadius: 10, background: '#0f172a', color: '#fff', fontWeight: 700, border: 'none' }}>CSV Export</button>
-            <button onClick={exportJSON} style={{ flex: 1, padding: 10, borderRadius: 10, background: '#185ADB', color: '#fff', fontWeight: 700, border: 'none' }}>Backup (JSON)</button>
+            <button onClick={exportCSV} style={{ flex: 1, padding: 10, borderRadius: 10, background: '#0f172a', color: '#fff', fontWeight: 700, border: 'none' }}>📊 Excel এ নিন</button>
+            <button onClick={exportJSON} style={{ flex: 1, padding: 10, borderRadius: 10, background: '#185ADB', color: '#fff', fontWeight: 700, border: 'none' }}>💾 হিসাব বাঁচান</button>
           </div>
           <label style={{ display: 'block', marginTop: 8, padding: 10, borderRadius: 10, background: '#fff', color: '#0f172a', textAlign: 'center', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-            Backup ফাইল থেকে ফিরিয়ে আনুন
+            ↩️ হিসাব ফিরান — আগের বাঁচানো ফাইল থেকে
             <input type="file" accept=".json" onChange={importJSON} style={{ display: 'none' }} />
           </label>
+          <p style={{ fontSize: 12, color: '#475569', marginTop: 8, lineHeight: 1.6 }}>📊 <b>Excel এ নিন</b> — হিসাব দেখা / প্রিন্ট করার জন্য। এটা দিয়ে হিসাব ফিরানো যাবে না।<br />💾 <b>হিসাব বাঁচান</b> — পুরো হিসাব ফাইলে বাঁচিয়ে রাখুন। ফোন বদলালেও হিসাব থাকবে।<br />↩️ <b>হিসাব ফিরান</b> — বাঁচানো ফাইল থেকে আগের হিসাব ফিরিয়ে আনুন।</p>
         </section>
 
         <section style={{ background: '#12294b', borderRadius: 18, padding: 16, marginBottom: 16 }}>
